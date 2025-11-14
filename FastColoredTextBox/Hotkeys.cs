@@ -34,8 +34,8 @@ namespace FastColoredTextBoxNS
             this[KEYS.Control | KEYS.A] = FCTBAction.SelectAll;
             this[KEYS.Control | KEYS.Z] = FCTBAction.Undo;
             this[KEYS.Control | KEYS.R] = FCTBAction.Redo;
-            this[KEYS.Control | KEYS.U] = FCTBAction.UpperCase;
-            this[KEYS.Shift | KEYS.Control | KEYS.U] = FCTBAction.LowerCase;
+            this[KEYS.Control | KEYS.U] = FCTBAction.LowerCase;
+            this[KEYS.Shift | KEYS.Control | KEYS.U] = FCTBAction.UpperCase;
             this[KEYS.Control | KEYS.OemMinus] = FCTBAction.NavigateBackward;
             this[KEYS.Control | KEYS.Shift | KEYS.OemMinus] = FCTBAction.NavigateForward;
             this[KEYS.Control | KEYS.B] = FCTBAction.BookmarkLine;

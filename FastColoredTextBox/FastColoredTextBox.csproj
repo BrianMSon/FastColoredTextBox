@@ -119,6 +119,7 @@
   <ItemGroup>
     <EmbeddedResource Include="FastColoredTextBox.resx">
       <DependentUpon>FastColoredTextBox.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="FindForm.resx">
       <DependentUpon>FindForm.cs</DependentUpon>

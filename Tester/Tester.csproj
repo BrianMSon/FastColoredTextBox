@@ -303,6 +303,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="AutocompleteSample.resx">
       <DependentUpon>AutocompleteSample.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="AutocompleteSample2.resx">
       <DependentUpon>AutocompleteSample2.cs</DependentUpon>
