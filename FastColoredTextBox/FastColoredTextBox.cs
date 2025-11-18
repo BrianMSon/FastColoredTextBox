@@ -98,6 +98,8 @@ namespace FastColoredTextBoxNS
         private int maxLineLength;
         private bool mouseIsDrag;
         private bool mouseIsDragDrop;
+        private bool isDoubleClickDrag;
+        private Place doubleClickDragAnchor;
         private bool multiline;
         protected bool needRecalc;
         protected bool needRecalcWordWrap;
@@ -5494,6 +5496,9 @@ namespace FastColoredTextBoxNS
             {
                 if (mouseIsDragDrop)
                     OnMouseClickText(e);
+
+                // Reset double-click drag state
+                isDoubleClickDrag = false;
             }
         }
 
@@ -5539,13 +5544,23 @@ namespace FastColoredTextBoxNS
 
                     if (e.Clicks == 2)
                     {
-                        mouseIsDrag = false;
+                        mouseIsDrag = true;  // Enable drag after double-click
                         mouseIsDragDrop = false;
                         draggedRange = null;
+                        isDoubleClickDrag = true;
 
                         SelectWord(p);
+
+                        // Save the start of the selected word as anchor for dragging
+                        int startPos = PlaceToPosition(Selection.Start);
+                        int endPos = PlaceToPosition(Selection.End);
+                        doubleClickDragAnchor = startPos < endPos ? Selection.Start : Selection.End;
+
                         return;
                     }
+
+                    // Reset double-click drag state on single click
+                    isDoubleClickDrag = false;
 
                     if (Selection.IsEmpty || !Selection.Contains(p) || this[p.iLine].Count <= p.iChar || ReadOnly)
                         OnMouseClickText(e);
@@ -5817,7 +5832,7 @@ namespace FastColoredTextBoxNS
                     UpdateScrollbars();
                     Invalidate();
                 }
-                else if (place != Selection.Start)
+                else if (isDoubleClickDrag || place != Selection.Start)
                 {
                     Place oldEnd = Selection.End;
                     Selection.BeginUpdate();
@@ -5825,10 +5840,23 @@ namespace FastColoredTextBoxNS
                     {
                         Selection.Start = place;
                         Selection.ColumnSelectionMode = true;
+                        Selection.End = oldEnd;
                     }
                     else
-                        Selection.Start = place;
-                    Selection.End = oldEnd;
+                    {
+                        // If dragging after double-click, use the saved anchor as start
+                        if (isDoubleClickDrag)
+                        {
+                            Selection.Start = doubleClickDragAnchor;
+                            Selection.End = place;
+                        }
+                        else
+                        {
+                            Selection.Start = place;
+                            Selection.End = oldEnd;
+                        }
+                    }
+
                     Selection.EndUpdate();
                     DoCaretVisible();
                     Invalidate();
