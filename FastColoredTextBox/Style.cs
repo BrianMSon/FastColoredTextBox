@@ -118,14 +118,25 @@ namespace FastColoredTextBoxNS
 
         public override void Draw(Graphics gr, Point position, Range range)
         {
+            Line line = range.tb[range.Start.iLine];
+
+            // 배경 영역 폭 계산 (CJK 문자 고려)
+            int bgWidth = 0;
+            for (int i = range.Start.iChar; i < range.End.iChar; i++)
+            {
+                if (FastColoredTextBox.IsCJKCharacter(line[i].c))
+                    bgWidth += range.tb.CharWidthCJK;
+                else
+                    bgWidth += range.tb.CharWidth;
+            }
+
             //draw background
             if (BackgroundBrush != null)
-                gr.FillRectangle(BackgroundBrush, position.X, position.Y, (range.End.iChar - range.Start.iChar) * range.tb.CharWidth, range.tb.CharHeight);
+                gr.FillRectangle(BackgroundBrush, position.X, position.Y, bgWidth, range.tb.CharHeight);
+
             //draw chars
             using(var f = new Font(range.tb.Font, FontStyle))
             {
-                Line line = range.tb[range.Start.iLine];
-                float dx = range.tb.CharWidth;
                 float y = position.Y + range.tb.LineInterval/2;
                 float x = position.X - range.tb.CharWidth/3;
 
@@ -137,24 +148,31 @@ namespace FastColoredTextBoxNS
                     //IME mode
                     for (int i = range.Start.iChar; i < range.End.iChar; i++)
                     {
-                        SizeF size = FastColoredTextBox.GetCharSize(f, line[i].c);
+                        char c = line[i].c;
+                        bool isCJK = FastColoredTextBox.IsCJKCharacter(c);
+                        float dx = isCJK ? range.tb.CharWidthCJK : range.tb.CharWidth;
+                        SizeF size = FastColoredTextBox.GetCharSize(f, c);
 
                         var gs = gr.Save();
-                        float k = size.Width > range.tb.CharWidth + 1 ? range.tb.CharWidth/size.Width : 1;
+                        float k = size.Width > dx + 1 ? dx/size.Width : 1;
                         gr.TranslateTransform(x, y + (1 - k)*range.tb.CharHeight/2);
                         gr.ScaleTransform(k, (float) Math.Sqrt(k));
-                        gr.DrawString(line[i].c.ToString(), f, ForeBrush, 0, 0, stringFormat);
+                        gr.DrawString(c.ToString(), f, ForeBrush, 0, 0, stringFormat);
                         gr.Restore(gs);
                         x += dx;
                     }
                 }
                 else
                 {
-                    //classic mode 
+                    //classic mode
                     for (int i = range.Start.iChar; i < range.End.iChar; i++)
                     {
+                        char c = line[i].c;
+                        bool isCJK = FastColoredTextBox.IsCJKCharacter(c);
+                        float dx = isCJK ? range.tb.CharWidthCJK : range.tb.CharWidth;
+
                         //draw char
-                        gr.DrawString(line[i].c.ToString(), f, ForeBrush, x, y, stringFormat);
+                        gr.DrawString(c.ToString(), f, ForeBrush, x, y, stringFormat);
                         x += dx;
                     }
                 }
@@ -276,7 +294,19 @@ namespace FastColoredTextBoxNS
             if (BackgroundBrush != null)
             {
                 gr.SmoothingMode = SmoothingMode.None;
-                var rect = new Rectangle(position.X, position.Y, (range.End.iChar - range.Start.iChar) * range.tb.CharWidth, range.tb.CharHeight);
+
+                // 선택 영역 폭 계산 (CJK 문자 고려)
+                int selectionWidth = 0;
+                Line line = range.tb[range.Start.iLine];
+                for (int i = range.Start.iChar; i < range.End.iChar && i < line.Count; i++)
+                {
+                    if (FastColoredTextBox.IsCJKCharacter(line[i].c))
+                        selectionWidth += range.tb.CharWidthCJK;
+                    else
+                        selectionWidth += range.tb.CharWidth;
+                }
+
+                var rect = new Rectangle(position.X, position.Y, selectionWidth, range.tb.CharHeight);
                 if (rect.Width == 0)
                     return;
                 gr.FillRectangle(BackgroundBrush, rect);

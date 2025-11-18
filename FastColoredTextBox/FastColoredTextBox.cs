@@ -20,6 +20,7 @@
 //
 // #define Styles32
 
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -30,12 +31,12 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Forms.Design;
-using Microsoft.Win32;
 using Timer = System.Windows.Forms.Timer;
 
 namespace FastColoredTextBoxNS
@@ -67,6 +68,7 @@ namespace FastColoredTextBoxNS
         private bool caretVisible;
         private Color changedLineColor;
         private int charHeight;
+        private int charHeightCJK;
         private Color currentLineColor;
         private Cursor defaultCursor;
         private Range delayedTextChangedRange;
@@ -493,6 +495,19 @@ namespace FastColoredTextBoxNS
         }
 
         /// <summary>
+        /// Height of CJK char in pixels (한글, 한자 등, includes LineInterval)
+        /// </summary>
+        [Browsable(false)]
+        public int CharHeightCJK
+        {
+            get { return charHeightCJK; }
+            set
+            {
+                charHeightCJK = value;
+            }
+        }
+
+        /// <summary>
         /// Interval between lines (in pixels)
         /// </summary>
         [Description("Interval between lines in pixels")]
@@ -509,10 +524,16 @@ namespace FastColoredTextBoxNS
         }
 
         /// <summary>
-        /// Width of char in pixels
+        /// Width of char in pixels (ASCII)
         /// </summary>
         [Browsable(false)]
         public int CharWidth { get; set; }
+
+        /// <summary>
+        /// Width of CJK char in pixels (한글, 한자 등)
+        /// </summary>
+        [Browsable(false)]
+        public int CharWidthCJK { get; set; }
 
         /// <summary>
         /// Spaces count for tab
@@ -1534,13 +1555,19 @@ namespace FastColoredTextBoxNS
             //check monospace font
             SizeF sizeM = GetCharSize(BaseFont, 'M');
             SizeF sizeDot = GetCharSize(BaseFont, '.');
+            SizeF sizeHangul = GetCharSize(BaseFont, '가');
+            SizeF sizeHanja = GetCharSize(BaseFont, '中');
             if (sizeM != sizeDot)
                 BaseFont = new Font("Courier New", BaseFont.SizeInPoints, FontStyle.Regular, GraphicsUnit.Point);
-            //clac size
-            SizeF size = GetCharSize(BaseFont, 'M');
-            CharWidth = (int) Math.Round(size.Width*1f /*0.85*/) - 1 /*0*/;
-            CharHeight = lineInterval + (int) Math.Round(size.Height*1f /*0.9*/) - 1 /*0*/;
-            //
+
+            // 영문(ASCII) 폰트 크기 설정 - 반각
+            CharWidth = (int)Math.Ceiling(sizeM.Width);
+            CharHeight = (int)Math.Ceiling(sizeM.Height);
+
+            // CJK(한글, 한자) 폰트 크기 설정
+            CharWidthCJK = (int)Math.Ceiling(Math.Max(sizeHangul.Width, sizeHanja.Width));
+            CharHeightCJK = (int)Math.Ceiling(Math.Max(sizeHangul.Height, sizeHanja.Height));
+
             //if (wordWrap)
             //    RecalcWordWrap(0, Lines.Count - 1);
             NeedRecalc(false, wordWrap);
@@ -2916,6 +2943,53 @@ namespace FastColoredTextBoxNS
             if (i < 0)
                 i = AddStyle(style);
             return i;
+        }
+
+        /// <summary>
+        /// CJK(한글, 한자, 일본어) 문자인지 판별
+        /// </summary>
+        public static bool IsCJKCharacter(char c)
+        {
+            int code = (int)c;
+            // 한글: AC00-D7AF
+            // 한글 자모: 1100-11FF, 3130-318F, A960-A97F, D7B0-D7FF
+            // 한자(CJK Unified Ideographs): 4E00-9FFF
+            // 한자 확장: 3400-4DBF, 20000-2A6DF, 2A700-2B73F, 2B740-2B81F, 2B820-2CEAF
+            // 일본어 히라가나: 3040-309F
+            // 일본어 가타카나: 30A0-30FF
+            // 반각 가타카나: FF65-FF9F
+            return (code >= 0x1100 && code <= 0x11FF) ||   // 한글 자모
+                   (code >= 0x3040 && code <= 0x309F) ||   // 히라가나
+                   (code >= 0x30A0 && code <= 0x30FF) ||   // 가타카나
+                   (code >= 0x3130 && code <= 0x318F) ||   // 한글 호환 자모
+                   (code >= 0x3400 && code <= 0x4DBF) ||   // 한자 확장 A
+                   (code >= 0x4E00 && code <= 0x9FFF) ||   // 한자 기본
+                   (code >= 0xA960 && code <= 0xA97F) ||   // 한글 자모 확장 A
+                   (code >= 0xAC00 && code <= 0xD7AF) ||   // 한글 음절
+                   (code >= 0xD7B0 && code <= 0xD7FF) ||   // 한글 자모 확장 B
+                   (code >= 0xFF65 && code <= 0xFF9F);     // 반각 가타카나
+        }
+
+        /// <summary>
+        /// 특정 범위의 문자들의 전체 폭 계산 (CJK 고려)
+        /// </summary>
+        private int GetTextWidth(int iLine, int startChar, int endChar)
+        {
+            if (iLine < 0 || iLine >= lines.Count)
+                return 0;
+
+            string lineText = lines[iLine].Text;
+            int width = 0;
+
+            for (int i = startChar; i < endChar && i < lineText.Length; i++)
+            {
+                if (IsCJKCharacter(lineText[i]))
+                    width += CharWidthCJK;
+                else
+                    width += CharWidth;
+            }
+
+            return width;
         }
 
         public static SizeF GetCharSize(Font font, char c)
@@ -5415,7 +5489,7 @@ namespace FastColoredTextBoxNS
             if (lineInfo.VisibleState == VisibleState.StartOfHiddenBlock)
             {
                 //rendering by FoldedBlockStyle
-                FoldedBlockStyle.Draw(gr, new Point(startX + firstChar*CharWidth, y),
+                FoldedBlockStyle.Draw(gr, new Point(startX + GetTextWidth(iLine, from, from + firstChar), y),
                                       new Range(this, from + firstChar, iLine, from + lastChar + 1, iLine));
             }
             else
@@ -5430,13 +5504,13 @@ namespace FastColoredTextBoxNS
                     if (currentStyleIndex != style)
                     {
                         FlushRendering(gr, currentStyleIndex,
-                                       new Point(startX + (iLastFlushedChar + 1)*CharWidth, y),
+                                       new Point(startX + GetTextWidth(iLine, from, from + iLastFlushedChar + 1), y),
                                        new Range(this, from + iLastFlushedChar + 1, iLine, from + iChar, iLine));
                         iLastFlushedChar = iChar - 1;
                         currentStyleIndex = style;
                     }
                 }
-                FlushRendering(gr, currentStyleIndex, new Point(startX + (iLastFlushedChar + 1)*CharWidth, y),
+                FlushRendering(gr, currentStyleIndex, new Point(startX + GetTextWidth(iLine, from, from + iLastFlushedChar + 1), y),
                                new Range(this, from + iLastFlushedChar + 1, iLine, from + lastChar + 1, iLine));
             }
 
@@ -5449,7 +5523,7 @@ namespace FastColoredTextBoxNS
                 textRange = Selection.GetIntersectionWith(textRange);
                 if (textRange != null && SelectionStyle != null)
                 {
-                    SelectionStyle.Draw(gr, new Point(startX + (textRange.Start.iChar - from)*CharWidth, 1 + y),
+                    SelectionStyle.Draw(gr, new Point(startX + GetTextWidth(iLine, from, textRange.Start.iChar), 1 + y),
                                         textRange);
                 }
             }
@@ -6081,11 +6155,25 @@ namespace FastColoredTextBoxNS
             //
             int start = LineInfos[iLine].GetWordWrapStringStartPosition(iWordWrapLine);
             int finish = LineInfos[iLine].GetWordWrapStringFinishPosition(iWordWrapLine, lines[iLine]);
-            var x = (int) Math.Round((float) point.X/CharWidth);
-            if (iWordWrapLine > 0)
-                x -= LineInfos[iLine].wordWrapIndent;
 
-            x = x < 0 ? start : start + x;
+            // 각 문자의 폭을 고려하여 x 위치 계산
+            int targetX = point.X;
+            if (iWordWrapLine > 0)
+                targetX -= LineInfos[iLine].wordWrapIndent * CharWidth;
+
+            int x = start;
+            int accumulatedWidth = 0;
+            string lineText = lines[iLine].Text;
+
+            for (int i = start; i < finish && i < lineText.Length; i++)
+            {
+                int charWidth = IsCJKCharacter(lineText[i]) ? CharWidthCJK : CharWidth;
+                if (accumulatedWidth + charWidth / 2 > targetX)
+                    break;
+                accumulatedWidth += charWidth;
+                x++;
+            }
+
             if (x > finish)
                 x = finish + 1;
             if (x > lines[iLine].Count)
@@ -6103,7 +6191,23 @@ namespace FastColoredTextBoxNS
             point.Offset(HorizontalScroll.Value, VerticalScroll.Value);
             point.Offset(-LeftIndent - Paddings.Left, 0);
             int iLine = YtoLineIndex(point.Y);
-            var x = (int) Math.Round((float) point.X/CharWidth);
+
+            // 각 문자의 폭을 고려하여 x 위치 계산
+            int x = 0;
+            int accumulatedWidth = 0;
+            if (iLine >= 0 && iLine < lines.Count)
+            {
+                string lineText = lines[iLine].Text;
+                for (int i = 0; i < lineText.Length; i++)
+                {
+                    int charWidth = IsCJKCharacter(lineText[i]) ? CharWidthCJK : CharWidth;
+                    if (accumulatedWidth + charWidth / 2 > point.X)
+                        break;
+                    accumulatedWidth += charWidth;
+                    x++;
+                }
+            }
+
             if (x < 0) x = 0;
             return new Place(x, iLine);
         }
@@ -6432,7 +6536,19 @@ namespace FastColoredTextBoxNS
             //
             int iWordWrapIndex = LineInfos[place.iLine].GetWordWrapStringIndex(place.iChar);
             y += iWordWrapIndex*CharHeight;
-            int x = (place.iChar - LineInfos[place.iLine].GetWordWrapStringStartPosition(iWordWrapIndex))*CharWidth;
+
+            // 각 문자의 폭을 개별 계산 (CJK vs ASCII)
+            int startPos = LineInfos[place.iLine].GetWordWrapStringStartPosition(iWordWrapIndex);
+            int x = 0;
+            string lineText = lines[place.iLine].Text;
+            for (int i = startPos; i < place.iChar && i < lineText.Length; i++)
+            {
+                if (IsCJKCharacter(lineText[i]))
+                    x += CharWidthCJK;
+                else
+                    x += CharWidth;
+            }
+
             if(iWordWrapIndex > 0 )
                 x += LineInfos[place.iLine].wordWrapIndent * CharWidth;
             //
