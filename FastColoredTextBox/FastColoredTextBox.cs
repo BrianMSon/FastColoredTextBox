@@ -5900,24 +5900,96 @@ namespace FastColoredTextBoxNS
             int fromX = p.iChar;
             int toX = p.iChar;
 
-            for (int i = p.iChar; i < lines[p.iLine].Count; i++)
+            // If clicked beyond the line length, use the last character
+            if (p.iChar >= lines[p.iLine].Count)
             {
-                char c = lines[p.iLine][i].c;
-                if (char.IsLetterOrDigit(c) || c == '_')
-                    toX = i + 1;
+                if (lines[p.iLine].Count > 0)
+                {
+                    // Use the last character position
+                    p = new Place(lines[p.iLine].Count - 1, p.iLine);
+                    fromX = p.iChar;
+                    toX = p.iChar;
+                }
                 else
-                    break;
+                {
+                    // Empty line
+                    Selection = new Range(this, p.iChar, p.iLine, p.iChar, p.iLine);
+                    return;
+                }
             }
 
-            for (int i = p.iChar - 1; i >= 0; i--)
+            char clickedChar = lines[p.iLine][p.iChar].c;
+            bool isWordChar = char.IsLetterOrDigit(clickedChar) || clickedChar == '_';
+            bool isWhitespace = char.IsWhiteSpace(clickedChar);
+
+            // Select based on character type
+            if (isWordChar)
             {
-                char c = lines[p.iLine][i].c;
-                if (char.IsLetterOrDigit(c) || c == '_')
-                    fromX = i;
-                else
-                    break;
+                // Select word characters (letters, digits, underscore)
+                for (int i = p.iChar; i < lines[p.iLine].Count; i++)
+                {
+                    char c = lines[p.iLine][i].c;
+                    if (char.IsLetterOrDigit(c) || c == '_')
+                        toX = i + 1;
+                    else
+                        break;
+                }
+
+                for (int i = p.iChar - 1; i >= 0; i--)
+                {
+                    char c = lines[p.iLine][i].c;
+                    if (char.IsLetterOrDigit(c) || c == '_')
+                        fromX = i;
+                    else
+                        break;
+                }
+            }
+            else if (isWhitespace)
+            {
+                // Select consecutive whitespace
+                for (int i = p.iChar; i < lines[p.iLine].Count; i++)
+                {
+                    char c = lines[p.iLine][i].c;
+                    if (char.IsWhiteSpace(c))
+                        toX = i + 1;
+                    else
+                        break;
+                }
+
+                for (int i = p.iChar - 1; i >= 0; i--)
+                {
+                    char c = lines[p.iLine][i].c;
+                    if (char.IsWhiteSpace(c))
+                        fromX = i;
+                    else
+                        break;
+                }
+            }
+            else
+            {
+                // Select consecutive special characters (non-word, non-whitespace)
+                for (int i = p.iChar; i < lines[p.iLine].Count; i++)
+                {
+                    char c = lines[p.iLine][i].c;
+                    bool isSpecialChar = !char.IsLetterOrDigit(c) && c != '_' && !char.IsWhiteSpace(c);
+                    if (isSpecialChar)
+                        toX = i + 1;
+                    else
+                        break;
+                }
+
+                for (int i = p.iChar - 1; i >= 0; i--)
+                {
+                    char c = lines[p.iLine][i].c;
+                    bool isSpecialChar = !char.IsLetterOrDigit(c) && c != '_' && !char.IsWhiteSpace(c);
+                    if (isSpecialChar)
+                        fromX = i;
+                    else
+                        break;
+                }
             }
 
+            // Set selection with reversed direction (cursor at end)
             Selection = new Range(this, toX, p.iLine, fromX, p.iLine);
         }
 
