@@ -1298,20 +1298,44 @@ namespace FastColoredTextBoxNS
             }
 
             Range range = this.Clone();//to OnSelectionChanged disable
-            bool wasSpace = false;
-            while (IsSpaceChar(range.CharBeforeStart))
+
+            // 공백 건너뛰기 (공백을 건너뛴 후 좌측 문자로 이동)
+            while (char.IsWhiteSpace(range.CharBeforeStart) && range.CharBeforeStart != '\n')
             {
-                wasSpace = true;
                 range.GoLeft(shift);
             }
-            bool wasIdentifier = false;
-            while (IsIdentifierChar(range.CharBeforeStart))
+
+            char firstChar = range.CharBeforeStart;
+
+            // 문자 타입 판별
+            bool isWordChar = char.IsLetterOrDigit(firstChar) || firstChar == '_';
+            bool isSpecialChar = !isWordChar && !char.IsWhiteSpace(firstChar) && firstChar != '\0';
+
+            if (isWordChar)
             {
-                wasIdentifier = true;
+                // 연속된 단어 문자 건너뛰기
+                while (IsIdentifierChar(range.CharBeforeStart))
+                {
+                    range.GoLeft(shift);
+                }
+            }
+            else if (isSpecialChar)
+            {
+                // 연속된 특수문자 건너뛰기
+                while (true)
+                {
+                    char c = range.CharBeforeStart;
+                    if (c == '\0' || char.IsLetterOrDigit(c) || c == '_' || char.IsWhiteSpace(c))
+                        break;
+                    range.GoLeft(shift);
+                }
+            }
+            else
+            {
+                // 기타 경우 (newline 등)
                 range.GoLeft(shift);
             }
-            if (!wasIdentifier && (!wasSpace || range.CharBeforeStart != '\n'))
-                range.GoLeft(shift);
+
             this.Start = range.Start;
             this.End = range.End;
 
@@ -1331,38 +1355,85 @@ namespace FastColoredTextBoxNS
 
             Range range = this.Clone();//to OnSelectionChanged disable
 
-            bool wasNewLine = false;
+            char firstChar = range.CharAfterStart;
 
-
-            if (range.CharAfterStart == '\n')
+            // 개행 문자 처리
+            if (firstChar == '\n')
             {
                 range.GoRight(shift);
-                wasNewLine = true;
+                this.Start = range.Start;
+                this.End = range.End;
+
+                if (tb.LineInfos[Start.iLine].VisibleState != VisibleState.Visible)
+                    GoLeft(shift);
+                return;
             }
 
-            bool wasSpace = false;
-            while (IsSpaceChar(range.CharAfterStart))
-            {
-                wasSpace = true;
-                range.GoRight(shift);
-            }
+            // 문자 타입 판별
+            bool isWordChar = char.IsLetterOrDigit(firstChar) || firstChar == '_';
+            bool isWhitespace = char.IsWhiteSpace(firstChar);
+            bool isSpecialChar = !isWordChar && !isWhitespace && firstChar != '\0';
 
-            if (!((wasSpace || wasNewLine) && goToStartOfNextWord))
+            if (isWhitespace)
             {
-
-                bool wasIdentifier = false;
-                while (IsIdentifierChar(range.CharAfterStart))
+                // 연속된 공백 건너뛰기
+                while (char.IsWhiteSpace(range.CharAfterStart) && range.CharAfterStart != '\n')
                 {
-                    wasIdentifier = true;
                     range.GoRight(shift);
                 }
 
-                if (!wasIdentifier)
-                    range.GoRight(shift);
+                // goToStartOfNextWord이면 여기서 멈춤
+                if (goToStartOfNextWord)
+                {
+                    this.Start = range.Start;
+                    this.End = range.End;
 
-                if (goToStartOfNextWord && !wasSpace)
-                    while (IsSpaceChar(range.CharAfterStart))
+                    if (tb.LineInfos[Start.iLine].VisibleState != VisibleState.Visible)
+                        GoLeft(shift);
+                    return;
+                }
+            }
+            else if (isWordChar)
+            {
+                // 연속된 단어 문자 건너뛰기
+                while (IsIdentifierChar(range.CharAfterStart))
+                {
+                    range.GoRight(shift);
+                }
+
+                // goToStartOfNextWord이면 다음 공백도 건너뜀
+                if (goToStartOfNextWord)
+                {
+                    while (char.IsWhiteSpace(range.CharAfterStart) && range.CharAfterStart != '\n')
+                    {
                         range.GoRight(shift);
+                    }
+                }
+            }
+            else if (isSpecialChar)
+            {
+                // 연속된 특수문자 건너뛰기
+                while (true)
+                {
+                    char c = range.CharAfterStart;
+                    if (c == '\0' || char.IsLetterOrDigit(c) || c == '_' || char.IsWhiteSpace(c))
+                        break;
+                    range.GoRight(shift);
+                }
+
+                // goToStartOfNextWord이면 다음 공백도 건너뜀
+                if (goToStartOfNextWord)
+                {
+                    while (char.IsWhiteSpace(range.CharAfterStart) && range.CharAfterStart != '\n')
+                    {
+                        range.GoRight(shift);
+                    }
+                }
+            }
+            else
+            {
+                // 기타 경우
+                range.GoRight(shift);
             }
 
             this.Start = range.Start;
