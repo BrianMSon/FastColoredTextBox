@@ -100,6 +100,7 @@ namespace FastColoredTextBoxNS
         private bool mouseIsDragDrop;
         private bool isDoubleClickDrag;
         private Place doubleClickDragAnchor;
+        private Place doubleClickDragAnchorEnd;
         private bool multiline;
         protected bool needRecalc;
         protected bool needRecalcWordWrap;
@@ -5551,10 +5552,19 @@ namespace FastColoredTextBoxNS
 
                         SelectWord(p);
 
-                        // Save the start of the selected word as anchor for dragging
+                        // Save both start and end of the selected word for dragging
                         int startPos = PlaceToPosition(Selection.Start);
                         int endPos = PlaceToPosition(Selection.End);
-                        doubleClickDragAnchor = startPos < endPos ? Selection.Start : Selection.End;
+                        if (startPos < endPos)
+                        {
+                            doubleClickDragAnchor = Selection.Start;
+                            doubleClickDragAnchorEnd = Selection.End;
+                        }
+                        else
+                        {
+                            doubleClickDragAnchor = Selection.End;
+                            doubleClickDragAnchorEnd = Selection.Start;
+                        }
 
                         return;
                     }
@@ -5847,8 +5857,29 @@ namespace FastColoredTextBoxNS
                         // If dragging after double-click, use the saved anchor as start
                         if (isDoubleClickDrag)
                         {
-                            Selection.Start = doubleClickDragAnchor;
-                            Selection.End = place;
+                            // Determine drag direction
+                            int currentPos = PlaceToPosition(place);
+                            int anchorPos = PlaceToPosition(doubleClickDragAnchor);
+                            int anchorEndPos = PlaceToPosition(doubleClickDragAnchorEnd);
+
+                            if (currentPos >= anchorEndPos)
+                            {
+                                // Dragging right/down: select from anchor start to current position
+                                Selection.Start = doubleClickDragAnchor;
+                                Selection.End = place;
+                            }
+                            else if (currentPos <= anchorPos)
+                            {
+                                // Dragging left/up: select from current position to anchor end
+                                Selection.Start = place;
+                                Selection.End = doubleClickDragAnchorEnd;
+                            }
+                            else
+                            {
+                                // Inside the word: keep original selection
+                                Selection.Start = doubleClickDragAnchor;
+                                Selection.End = doubleClickDragAnchorEnd;
+                            }
                         }
                         else
                         {
