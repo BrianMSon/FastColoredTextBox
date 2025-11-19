@@ -612,7 +612,7 @@ namespace FastColoredTextBoxNS
         {
             get 
             {
-                int rightPaddingStartX = LeftIndent + maxLineLength * CharWidth + Paddings.Left + 1;
+                int rightPaddingStartX = LeftIndent + maxLineLength + Paddings.Left + 1;
                 rightPaddingStartX = Math.Max(ClientSize.Width - Paddings.Right, rightPaddingStartX);
                 int bottomPaddingStartY = TextHeight + Paddings.Top;
                 bottomPaddingStartY = Math.Max(ClientSize.Height - Paddings.Bottom, bottomPaddingStartY);
@@ -3191,8 +3191,22 @@ namespace FastColoredTextBoxNS
             maxLineLength = RecalcMaxLineLength();
 
             //adjust AutoScrollMinSize
-            int minWidth;
-            CalcMinAutosizeWidth(out minWidth, ref maxLineLength);
+            int minWidth = LeftIndent + maxLineLength + 2 + Paddings.Left + Paddings.Right;
+            if (wordWrap)
+            {
+                int w = ClientSize.Width - LeftIndent - Paddings.Left - Paddings.Right;
+                switch (WordWrapMode)
+                {
+                    case WordWrapMode.WordWrapControlWidth:
+                    case WordWrapMode.CharWrapControlWidth:
+                        minWidth = 0;
+                        break;
+                    case WordWrapMode.WordWrapPreferredWidth:
+                    case WordWrapMode.CharWrapPreferredWidth:
+                        minWidth = LeftIndent + PreferredLineWidth*CharWidth + 2 + Paddings.Left + Paddings.Right;
+                        break;
+                }
+            }
             
             AutoScrollMinSize = new Size(minWidth, TextHeight + Paddings.Top + Paddings.Bottom);
             UpdateScrollbars();
@@ -3229,20 +3243,19 @@ namespace FastColoredTextBoxNS
             if (iLine >= lines.Count)
                 return;
 
-            int maxLineLength = lines[iLine].Count;
-            if (this.maxLineLength < maxLineLength && !WordWrap)
-                this.maxLineLength = maxLineLength;
-
-            int minWidth;
-            CalcMinAutosizeWidth(out minWidth, ref maxLineLength);
-
-            if (AutoScrollMinSize.Width < minWidth)
-                AutoScrollMinSize = new Size(minWidth, AutoScrollMinSize.Height);
+            int linePixelWidth = GetTextWidth(iLine, 0, lines[iLine].Count);
+            if (this.maxLineLength < linePixelWidth && !WordWrap)
+            {
+                this.maxLineLength = linePixelWidth;
+                int minWidth = LeftIndent + maxLineLength + 2 + Paddings.Left + Paddings.Right;
+                if (AutoScrollMinSize.Width < minWidth)
+                    AutoScrollMinSize = new Size(minWidth, AutoScrollMinSize.Height);
+            }
         }
 
         private int RecalcMaxLineLength()
         {
-            int maxLineLength = 0;
+            int maxLineWidth = 0;
             TextSource lines = this.lines;
             int count = lines.Count;
             int charHeight = CharHeight;
@@ -3251,10 +3264,14 @@ namespace FastColoredTextBoxNS
 
             for (int i = 0; i < count; i++)
             {
-                int lineLength = lines.GetLineLength(i);
                 LineInfo lineInfo = LineInfos[i];
-                if (lineLength > maxLineLength && lineInfo.VisibleState == VisibleState.Visible)
-                    maxLineLength = lineLength;
+                
+                // Calculate pixel width of the line
+                int currentLineWidth = GetTextWidth(i, 0, lines[i].Count);
+
+                if (currentLineWidth > maxLineWidth && lineInfo.VisibleState == VisibleState.Visible)
+                    maxLineWidth = currentLineWidth;
+
                 lineInfo.startY = TextHeight;
                 TextHeight += lineInfo.WordWrapStringsCount*charHeight + lineInfo.bottomPadding;
                 LineInfos[i] = lineInfo;
@@ -3262,7 +3279,7 @@ namespace FastColoredTextBoxNS
 
             TextHeight -= topIndent;
 
-            return maxLineLength;
+            return maxLineWidth;
         }
 
         private int GetMaxLineWordWrapedWidth()
@@ -5082,7 +5099,7 @@ namespace FastColoredTextBoxNS
             //top
             e.Graphics.FillRectangle(paddingBrush, 0, -VerticalScroll.Value, ClientSize.Width, Math.Max(0, Paddings.Top - 1));
             //bottom
-            e.Graphics.FillRectangle(paddingBrush, 0, textAreaRect.Bottom, ClientSize.Width,ClientSize.Height);
+            e.Graphics.FillRectangle(paddingBrush, 0, textAreaRect.Bottom, ClientSize.Width, ClientSize.Height);
             //right
             e.Graphics.FillRectangle(paddingBrush, textAreaRect.Right, 0, ClientSize.Width, ClientSize.Height);
             //left
@@ -5101,21 +5118,16 @@ namespace FastColoredTextBoxNS
             if (PreferredLineWidth > 0)
                 e.Graphics.DrawLine(servicePen,
                                     new Point(
-                                        LeftIndent + Paddings.Left + PreferredLineWidth*CharWidth -
+                                        LeftIndent + Paddings.Left + PreferredLineWidth * CharWidth -
                                         HorizontalScroll.Value + 1, textAreaRect.Top + 1),
                                     new Point(
-                                        LeftIndent + Paddings.Left + PreferredLineWidth*CharWidth -
+                                        LeftIndent + Paddings.Left + PreferredLineWidth * CharWidth -
                                         HorizontalScroll.Value + 1, textAreaRect.Bottom - 1));
 
             //draw text area border
             DrawTextAreaBorder(e.Graphics);
             //
-            int firstChar = (Math.Max(0, HorizontalScroll.Value - Paddings.Left))/CharWidth;
-            int lastChar = (HorizontalScroll.Value + ClientSize.Width)/CharWidth;
-            //
             var x = LeftIndent + Paddings.Left - HorizontalScroll.Value;
-            if (x < LeftIndent)
-                firstChar++;
             //create dictionary of bookmarks
             var bookmarksByLineIndex = new Dictionary<int, Bookmark>();
             foreach (Bookmark item in bookmarks)
@@ -5134,7 +5146,7 @@ namespace FastColoredTextBoxNS
                 //
                 if (lineInfo.startY > VerticalScroll.Value + ClientSize.Height)
                     break;
-                if (lineInfo.startY + lineInfo.WordWrapStringsCount*CharHeight < VerticalScroll.Value)
+                if (lineInfo.startY + lineInfo.WordWrapStringsCount * CharHeight < VerticalScroll.Value)
                     continue;
                 if (lineInfo.VisibleState == VisibleState.Hidden)
                     continue;
@@ -5147,7 +5159,7 @@ namespace FastColoredTextBoxNS
                     if (line.BackgroundBrush != null)
                         e.Graphics.FillRectangle(line.BackgroundBrush,
                                                  new Rectangle(textAreaRect.Left, y, textAreaRect.Width,
-                                                               CharHeight*lineInfo.WordWrapStringsCount));
+                                                               CharHeight * lineInfo.WordWrapStringsCount));
                 //draw current line background
                 if (CurrentLineColor != Color.Transparent && iLine == Selection.Start.iLine)
                     if (Selection.IsEmpty)
@@ -5164,12 +5176,12 @@ namespace FastColoredTextBoxNS
                 if (bookmarksByLineIndex.ContainsKey(iLine))
                     bookmarksByLineIndex[iLine].Paint(e.Graphics,
                                                       new Rectangle(LeftIndent, y, Width,
-                                                                    CharHeight*lineInfo.WordWrapStringsCount));
+                                                                    CharHeight * lineInfo.WordWrapStringsCount));
                 //OnPaintLine event
                 if (lineInfo.VisibleState == VisibleState.Visible)
                     OnPaintLine(new PaintLineEventArgs(iLine,
                                                        new Rectangle(LeftIndent, y, Width,
-                                                                     CharHeight*lineInfo.WordWrapStringsCount),
+                                                                     CharHeight * lineInfo.WordWrapStringsCount),
                                                        e.Graphics, e.ClipRectangle));
                 //draw line number
                 if (ShowLineNumbers)
@@ -5187,20 +5199,20 @@ namespace FastColoredTextBoxNS
                 int markerSize = (int)(defaultMarkerSize * zoom / 100f);
                 int markerRadius = markerSize / 2;
                 if (lineInfo.VisibleState == VisibleState.StartOfHiddenBlock)
-                    visibleMarkers.Add(new ExpandFoldingMarker(iLine, new Rectangle(LeftIndentLine - markerRadius, y + CharHeight/2 - markerRadius + 1, markerSize, markerSize)));
+                    visibleMarkers.Add(new ExpandFoldingMarker(iLine, new Rectangle(LeftIndentLine - markerRadius, y + CharHeight / 2 - markerRadius + 1, markerSize, markerSize)));
 
                 if (!string.IsNullOrEmpty(line.FoldingStartMarker) && lineInfo.VisibleState == VisibleState.Visible &&
                     string.IsNullOrEmpty(line.FoldingEndMarker))
-                        visibleMarkers.Add(new CollapseFoldingMarker(iLine, new Rectangle(LeftIndentLine - markerRadius, y + CharHeight/2 - markerRadius + 1, markerSize, markerSize)));
+                    visibleMarkers.Add(new CollapseFoldingMarker(iLine, new Rectangle(LeftIndentLine - markerRadius, y + CharHeight / 2 - markerRadius + 1, markerSize, markerSize)));
 
                 if (lineInfo.VisibleState == VisibleState.Visible && !string.IsNullOrEmpty(line.FoldingEndMarker) &&
                     string.IsNullOrEmpty(line.FoldingStartMarker))
-                    e.Graphics.DrawLine(servicePen, LeftIndentLine, y + CharHeight*lineInfo.WordWrapStringsCount - 1,
-                                        LeftIndentLine + 4, y + CharHeight*lineInfo.WordWrapStringsCount - 1);
+                    e.Graphics.DrawLine(servicePen, LeftIndentLine, y + CharHeight * lineInfo.WordWrapStringsCount - 1,
+                                        LeftIndentLine + 4, y + CharHeight * lineInfo.WordWrapStringsCount - 1);
                 //draw wordwrap strings of line
                 for (int iWordWrapLine = 0; iWordWrapLine < lineInfo.WordWrapStringsCount; iWordWrapLine++)
                 {
-                    y = lineInfo.startY + iWordWrapLine*CharHeight - VerticalScroll.Value;
+                    y = lineInfo.startY + iWordWrapLine * CharHeight - VerticalScroll.Value;
                     // break if too long line (important for extremly big lines)
                     if (y > VerticalScroll.Value + ClientSize.Height)
                         break;
@@ -5211,10 +5223,14 @@ namespace FastColoredTextBoxNS
                     //indent
                     var indent = iWordWrapLine == 0 ? 0 : lineInfo.wordWrapIndent * CharWidth;
                     //draw chars
-                    DrawLineChars(e.Graphics, firstChar, lastChar, iLine, iWordWrapLine, x + indent, y);
+                    var oldClip = e.Graphics.Clip;
+                    var clipRect = new Rectangle(LeftIndent, y, ClientSize.Width - LeftIndent, CharHeight);
+                    if(clipRect.Width > 0)
+                        e.Graphics.SetClip(clipRect);
+                    DrawLineChars(e.Graphics, 0, int.MaxValue, iLine, iWordWrapLine, x + indent, y);
+                    e.Graphics.Clip = oldClip;
                 }
             }
-
             int endLine = iLine - 1;
 
             //draw folding lines
