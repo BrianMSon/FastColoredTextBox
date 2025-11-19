@@ -6165,7 +6165,7 @@ namespace FastColoredTextBoxNS
             int accumulatedWidth = 0;
             string lineText = lines[iLine].Text;
 
-            for (int i = start; i < finish && i < lineText.Length; i++)
+            for (int i = start; i <= finish && i < lineText.Length; i++)
             {
                 int charWidth = IsCJKCharacter(lineText[i]) ? CharWidthCJK : CharWidth;
                 if (accumulatedWidth + charWidth / 2 > targetX)
