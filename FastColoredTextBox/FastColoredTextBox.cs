@@ -5931,6 +5931,9 @@ namespace FastColoredTextBoxNS
                         // If dragging after double-click, use the saved anchor as start
                         if (isDoubleClickDrag)
                         {
+                            // Get word boundary at current mouse position
+                            GetWordBoundary(place, out Place currentWordStart, out Place currentWordEnd);
+
                             // Determine drag direction
                             int currentPos = PlaceToPosition(place);
                             int anchorPos = PlaceToPosition(doubleClickDragAnchor);
@@ -5938,14 +5941,14 @@ namespace FastColoredTextBoxNS
 
                             if (currentPos >= anchorEndPos)
                             {
-                                // Dragging right/down: select from anchor start to current position
+                                // Dragging right/down: select from anchor start to current word end
                                 Selection.Start = doubleClickDragAnchor;
-                                Selection.End = place;
+                                Selection.End = currentWordEnd;
                             }
                             else if (currentPos <= anchorPos)
                             {
-                                // Dragging left/up: select from current position to anchor end
-                                Selection.Start = place;
+                                // Dragging left/up: select from current word start to anchor end
+                                Selection.Start = currentWordStart;
                                 Selection.End = doubleClickDragAnchorEnd;
                             }
                             else
@@ -6000,37 +6003,30 @@ namespace FastColoredTextBoxNS
                 OnMarkerDoubleClick(m);
         }
 
-        private void SelectWord(Place p)
+        private void GetWordBoundary(Place p, out Place wordStart, out Place wordEnd)
         {
-            int fromX = p.iChar;
-            int toX = p.iChar;
+            wordStart = p;
+            wordEnd = p;
 
-            // If clicked beyond the line length, use the last character
+            // If position is beyond the line length, return the line end
             if (p.iChar >= lines[p.iLine].Count)
             {
-                if (lines[p.iLine].Count > 0)
-                {
-                    // Use the last character position
-                    p = new Place(lines[p.iLine].Count - 1, p.iLine);
-                    fromX = p.iChar;
-                    toX = p.iChar;
-                }
-                else
-                {
-                    // Empty line
-                    Selection = new Range(this, p.iChar, p.iLine, p.iChar, p.iLine);
-                    return;
-                }
+                wordStart = new Place(lines[p.iLine].Count, p.iLine);
+                wordEnd = new Place(lines[p.iLine].Count, p.iLine);
+                return;
             }
 
             char clickedChar = lines[p.iLine][p.iChar].c;
             bool isWordChar = char.IsLetterOrDigit(clickedChar) || clickedChar == '_';
             bool isWhitespace = char.IsWhiteSpace(clickedChar);
 
-            // Select based on character type
+            int fromX = p.iChar;
+            int toX = p.iChar;
+
+            // Find word boundary based on character type
             if (isWordChar)
             {
-                // Select word characters (letters, digits, underscore)
+                // Find word characters boundary (letters, digits, underscore)
                 for (int i = p.iChar; i < lines[p.iLine].Count; i++)
                 {
                     char c = lines[p.iLine][i].c;
@@ -6051,7 +6047,7 @@ namespace FastColoredTextBoxNS
             }
             else if (isWhitespace)
             {
-                // Select consecutive whitespace
+                // Find consecutive whitespace boundary
                 for (int i = p.iChar; i < lines[p.iLine].Count; i++)
                 {
                     char c = lines[p.iLine][i].c;
@@ -6072,7 +6068,7 @@ namespace FastColoredTextBoxNS
             }
             else
             {
-                // Select consecutive special characters (non-word, non-whitespace)
+                // Find consecutive special characters boundary (non-word, non-whitespace)
                 for (int i = p.iChar; i < lines[p.iLine].Count; i++)
                 {
                     char c = lines[p.iLine][i].c;
@@ -6094,8 +6090,24 @@ namespace FastColoredTextBoxNS
                 }
             }
 
+            wordStart = new Place(fromX, p.iLine);
+            wordEnd = new Place(toX, p.iLine);
+        }
+
+        private void SelectWord(Place p)
+        {
+            GetWordBoundary(p, out Place wordStart, out Place wordEnd);
+
+            // If beyond the line length
+            if (p.iChar >= lines[p.iLine].Count && lines[p.iLine].Count == 0)
+            {
+                // Empty line
+                Selection = new Range(this, p.iChar, p.iLine, p.iChar, p.iLine);
+                return;
+            }
+
             // Set selection with reversed direction (cursor at end)
-            Selection = new Range(this, toX, p.iLine, fromX, p.iLine);
+            Selection = new Range(this, wordEnd.iChar, wordEnd.iLine, wordStart.iChar, wordStart.iLine);
         }
 
         public int YtoLineIndex(int y)
