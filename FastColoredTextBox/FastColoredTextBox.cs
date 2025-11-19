@@ -5624,21 +5624,15 @@ namespace FastColoredTextBoxNS
                         draggedRange = null;
                         isDoubleClickDrag = true;
 
-                        SelectWord(p);
+                        // Get word boundary at clicked position
+                        GetWordBoundary(p, out Place wordStart, out Place wordEnd);
 
-                        // Save both start and end of the selected word for dragging
-                        int startPos = PlaceToPosition(Selection.Start);
-                        int endPos = PlaceToPosition(Selection.End);
-                        if (startPos < endPos)
-                        {
-                            doubleClickDragAnchor = Selection.Start;
-                            doubleClickDragAnchorEnd = Selection.End;
-                        }
-                        else
-                        {
-                            doubleClickDragAnchor = Selection.End;
-                            doubleClickDragAnchorEnd = Selection.Start;
-                        }
+                        // Always set selection with cursor at start
+                        Selection = new Range(this, wordEnd.iChar, wordEnd.iLine, wordStart.iChar, wordStart.iLine);
+
+                        // Save word boundaries for dragging (always in document order)
+                        doubleClickDragAnchor = wordStart;
+                        doubleClickDragAnchorEnd = wordEnd;
 
                         return;
                     }
@@ -5942,20 +5936,22 @@ namespace FastColoredTextBoxNS
                             if (currentPos >= anchorEndPos)
                             {
                                 // Dragging right/down: select from anchor start to current word end
-                                Selection.Start = doubleClickDragAnchor;
-                                Selection.End = currentWordEnd;
+                                // Cursor at start: reverse Start/End
+                                Selection.Start = currentWordEnd;
+                                Selection.End = doubleClickDragAnchor;
                             }
                             else if (currentPos <= anchorPos)
                             {
                                 // Dragging left/up: select from current word start to anchor end
-                                Selection.Start = currentWordStart;
-                                Selection.End = doubleClickDragAnchorEnd;
+                                // Cursor at start: reverse Start/End
+                                Selection.Start = doubleClickDragAnchorEnd;
+                                Selection.End = currentWordStart;
                             }
                             else
                             {
-                                // Inside the word: keep original selection
-                                Selection.Start = doubleClickDragAnchor;
-                                Selection.End = doubleClickDragAnchorEnd;
+                                // Inside the word: keep original selection with cursor at start
+                                Selection.Start = doubleClickDragAnchorEnd;
+                                Selection.End = doubleClickDragAnchor;
                             }
                         }
                         else
@@ -6106,7 +6102,7 @@ namespace FastColoredTextBoxNS
                 return;
             }
 
-            // Set selection with reversed direction (cursor at end)
+            // Set selection with cursor at start (for consistency)
             Selection = new Range(this, wordEnd.iChar, wordEnd.iLine, wordStart.iChar, wordStart.iLine);
         }
 
