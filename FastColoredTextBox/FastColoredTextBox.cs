@@ -3409,6 +3409,12 @@ namespace FastColoredTextBoxNS
         protected override void OnClientSizeChanged(EventArgs e)
         {
             base.OnClientSizeChanged(e);
+
+            // Reset double-click drag state when window is resized/maximized
+            // This prevents unwanted text selection when titlebar is double-clicked
+            isDoubleClickDrag = false;
+            mouseIsDrag = false;
+
             if (WordWrap)
             {
                 //RecalcWordWrap(0, lines.Count - 1);
