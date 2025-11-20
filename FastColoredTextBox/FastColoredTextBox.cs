@@ -5225,7 +5225,8 @@ namespace FastColoredTextBoxNS
                     var indent = iWordWrapLine == 0 ? 0 : lineInfo.wordWrapIndent * CharWidth;
                     //draw chars
                     var oldClip = e.Graphics.Clip;
-                    var clipRect = new Rectangle(LeftIndent, y, ClientSize.Width - LeftIndent, CharHeight);
+                    // 텍스트 영역 전체를 clip 영역으로 사용하여 부분적으로 보이는 라인도 표시되도록 함
+                    var clipRect = new Rectangle(LeftIndent, textAreaRect.Top, textAreaRect.Width, textAreaRect.Height);
                     if(clipRect.Width > 0)
                         e.Graphics.SetClip(clipRect);
                     DrawLineChars(e.Graphics, 0, int.MaxValue, iLine, iWordWrapLine, x + indent, y);
