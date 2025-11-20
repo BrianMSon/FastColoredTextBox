@@ -6028,20 +6028,79 @@ namespace FastColoredTextBoxNS
             wordStart = p;
             wordEnd = p;
 
-            // If position is beyond the line length, return the line end
+            // Declare variables at the beginning
+            int fromX;
+            int toX;
+            bool isWordChar;
+            bool isWhitespace;
+            char clickedChar;
+
+            // If position is beyond the line length (trailing whitespace), find the last word on the line
             if (p.iChar >= lines[p.iLine].Count)
             {
-                wordStart = new Place(lines[p.iLine].Count, p.iLine);
-                wordEnd = new Place(lines[p.iLine].Count, p.iLine);
+                // Find the last non-whitespace character position
+                int lastNonWhitespace = -1;
+                for (int i = lines[p.iLine].Count - 1; i >= 0; i--)
+                {
+                    if (!char.IsWhiteSpace(lines[p.iLine][i].c))
+                    {
+                        lastNonWhitespace = i;
+                        break;
+                    }
+                }
+
+                // If no non-whitespace character found (empty line or whitespace only)
+                if (lastNonWhitespace < 0)
+                {
+                    wordStart = new Place(lines[p.iLine].Count, p.iLine);
+                    wordEnd = new Place(lines[p.iLine].Count, p.iLine);
+                    return;
+                }
+
+                // Create a place at the last non-whitespace character and find its word boundary
+                char lastChar = lines[p.iLine][lastNonWhitespace].c;
+                isWordChar = char.IsLetterOrDigit(lastChar) || lastChar == '_';
+
+                fromX = lastNonWhitespace;
+                toX = lastNonWhitespace + 1;
+
+                if (isWordChar)
+                {
+                    // Find word characters boundary (letters, digits, underscore)
+                    for (int i = lastNonWhitespace - 1; i >= 0; i--)
+                    {
+                        char c = lines[p.iLine][i].c;
+                        if (char.IsLetterOrDigit(c) || c == '_')
+                            fromX = i;
+                        else
+                            break;
+                    }
+                }
+                else
+                {
+                    // Find consecutive special characters boundary (non-word, non-whitespace)
+                    for (int i = lastNonWhitespace - 1; i >= 0; i--)
+                    {
+                        char c = lines[p.iLine][i].c;
+                        bool isSpecialChar = !char.IsLetterOrDigit(c) && c != '_' && !char.IsWhiteSpace(c);
+                        if (isSpecialChar)
+                            fromX = i;
+                        else
+                            break;
+                    }
+                }
+
+                wordStart = new Place(fromX, p.iLine);
+                wordEnd = new Place(toX, p.iLine);
                 return;
             }
 
-            char clickedChar = lines[p.iLine][p.iChar].c;
-            bool isWordChar = char.IsLetterOrDigit(clickedChar) || clickedChar == '_';
-            bool isWhitespace = char.IsWhiteSpace(clickedChar);
+            clickedChar = lines[p.iLine][p.iChar].c;
+            isWordChar = char.IsLetterOrDigit(clickedChar) || clickedChar == '_';
+            isWhitespace = char.IsWhiteSpace(clickedChar);
 
-            int fromX = p.iChar;
-            int toX = p.iChar;
+            fromX = p.iChar;
+            toX = p.iChar;
 
             // Find word boundary based on character type
             if (isWordChar)
