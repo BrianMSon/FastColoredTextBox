@@ -4472,6 +4472,7 @@ namespace FastColoredTextBoxNS
                     DoAutoIndentChars(Selection.Start.iLine);
 
                 OnKeyPressed('\b');
+                DoCaretVisible();
                 return true;
             }
  
