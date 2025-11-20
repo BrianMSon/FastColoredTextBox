@@ -1454,6 +1454,7 @@ namespace FastColoredTextBoxNS
             if (!shift)
                 end = start;
 
+            preferedPos = -1;
             OnSelectionChanged();
         }
 
@@ -1468,6 +1469,7 @@ namespace FastColoredTextBoxNS
             if (!shift)
                 end = start;
 
+            preferedPos = -1;
             OnSelectionChanged();
         }
 
