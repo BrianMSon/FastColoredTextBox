@@ -306,6 +306,13 @@ namespace FastColoredTextBoxNS
                         selectionWidth += range.tb.CharWidth;
                 }
 
+                // 줄 끝을 넘어선 선택(줄바꿈 문자 포함) 또는 빈 줄인 경우 한 글자 너비 추가
+                if (range.End.iChar > line.Count && range.Start.iChar < range.End.iChar)
+                    selectionWidth += range.tb.CharWidth;
+                // 빈 줄인 경우 (문자가 없지만 선택 범위는 있음)
+                else if (selectionWidth == 0 && range.Start.iChar < range.End.iChar)
+                    selectionWidth = range.tb.CharWidth;
+
                 var rect = new Rectangle(position.X, position.Y, selectionWidth, range.tb.CharHeight);
                 if (rect.Width == 0)
                     return;
