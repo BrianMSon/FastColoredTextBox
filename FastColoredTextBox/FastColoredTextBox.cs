@@ -3300,7 +3300,7 @@ namespace FastColoredTextBoxNS
 
         private void RecalcWordWrap(int fromLine, int toLine)
         {
-            int maxCharsPerLine = 0;
+            int maxWidthInPixels = 0;
             bool charWrap = false;
 
             toLine = Math.Min(LinesCount - 1, toLine);
@@ -3308,17 +3308,17 @@ namespace FastColoredTextBoxNS
             switch (WordWrapMode)
             {
                 case WordWrapMode.WordWrapControlWidth:
-                    maxCharsPerLine = (ClientSize.Width - LeftIndent - Paddings.Left - Paddings.Right)/CharWidth;
+                    maxWidthInPixels = (ClientSize.Width - LeftIndent - Paddings.Left - Paddings.Right - CharWidth);
                     break;
                 case WordWrapMode.CharWrapControlWidth:
-                    maxCharsPerLine = (ClientSize.Width - LeftIndent - Paddings.Left - Paddings.Right)/CharWidth;
+                    maxWidthInPixels = (ClientSize.Width - LeftIndent - Paddings.Left - Paddings.Right - CharWidth);
                     charWrap = true;
                     break;
                 case WordWrapMode.WordWrapPreferredWidth:
-                    maxCharsPerLine = PreferredLineWidth;
+                    maxWidthInPixels = PreferredLineWidth * CharWidth;
                     break;
                 case WordWrapMode.CharWrapPreferredWidth:
-                    maxCharsPerLine = PreferredLineWidth;
+                    maxWidthInPixels = PreferredLineWidth * CharWidth;
                     charWrap = true;
                     break;
             }
@@ -3340,7 +3340,7 @@ namespace FastColoredTextBoxNS
                                 WordWrapNeeded(this, new WordWrapNeededEventArgs(li.CutOffPositions, ImeAllowed, lines[iLine]));
                         }
                         else
-                            CalcCutOffs(li.CutOffPositions, maxCharsPerLine, maxCharsPerLine - li.wordWrapIndent, ImeAllowed, charWrap, lines[iLine]);
+                            CalcCutOffs(li.CutOffPositions, maxWidthInPixels, maxWidthInPixels - (li.wordWrapIndent*CharWidth), ImeAllowed, charWrap, lines[iLine], CharWidth, CharWidthCJK);
 
                         LineInfos[iLine] = li;
                     }
@@ -3351,45 +3351,62 @@ namespace FastColoredTextBoxNS
         /// <summary>
         /// Calculates wordwrap cutoffs
         /// </summary>
-        public static void CalcCutOffs(List<int> cutOffPositions, int maxCharsPerLine, int maxCharsPerSecondaryLine, bool allowIME, bool charWrap, Line line)
+        public static void CalcCutOffs(List<int> cutOffPositions, int maxWidth, int secondaryMaxWidth, bool allowIME, bool charWrap, Line line, int charWidth, int charWidthCJK)
         {
-            if (maxCharsPerSecondaryLine < 1) maxCharsPerSecondaryLine = 1;
-            if (maxCharsPerLine < 1) maxCharsPerLine = 1;
+            if (secondaryMaxWidth < 1) secondaryMaxWidth = 1;
+            if (maxWidth < 1) maxWidth = 1;
 
-            int segmentLength = 0;
-            int cutOff = 0;
             cutOffPositions.Clear();
 
-            for (int i = 0; i < line.Count - 1; i++)
+            int currentWidth = 0;
+            int currentMaxWidth = maxWidth;
+            int lastPossibleCutOff = 0;
+            int lastCutOffPosition = 0;
+
+            for (int i = 0; i < line.Count; i++)
             {
                 char c = line[i].c;
+                int cWidth = IsCJKCharacter(c) ? charWidthCJK : charWidth;
+
                 if (charWrap)
                 {
-                    //char wrapping
-                    cutOff = i + 1;
+                    lastPossibleCutOff = i + 1;
                 }
                 else
                 {
-                    //word wrapping
-                    if (allowIME && IsCJKLetter(c))//in CJK languages cutoff can be in any letter
+                    if (allowIME && IsCJKLetter(c))
                     {
-                        cutOff = i;
+                        lastPossibleCutOff = i;
                     }
-                    else
-                    if (!char.IsLetterOrDigit(c) && c != '_' && c != '\'' && c != '\xa0' 
-                        && ((c != '.' && c!= ',') || !char.IsDigit(line[i + 1].c)))//dot before digit
-                        cutOff = Math.Min(i + 1, line.Count - 1);
+                    else if (!char.IsLetterOrDigit(c) && c != '_' && c != '\'' && c != '\xa0' && ((c != '.' && c != ',') || (i + 1 < line.Count && !char.IsDigit(line[i + 1].c))))
+                    {
+                        lastPossibleCutOff = Math.Min(i + 1, line.Count);
+                    }
                 }
 
-                segmentLength++;
+                currentWidth += cWidth;
 
-                if (segmentLength == maxCharsPerLine)
+                if (currentWidth > currentMaxWidth)
                 {
-                    if (cutOff == 0 || (cutOffPositions.Count > 0 && cutOff == cutOffPositions[cutOffPositions.Count - 1]))
-                        cutOff = i + 1;
-                    cutOffPositions.Add(cutOff);
-                    segmentLength = 1 + i - cutOff;
-                    maxCharsPerLine = maxCharsPerSecondaryLine;
+                    if (lastPossibleCutOff <= lastCutOffPosition)
+                    {
+                        lastPossibleCutOff = i;
+                    }
+
+                    if (lastPossibleCutOff <= lastCutOffPosition) lastPossibleCutOff = i > 0 ? i : 1;
+                    if (lastPossibleCutOff == 0 && i > 0) lastPossibleCutOff = i;
+
+
+                    cutOffPositions.Add(lastPossibleCutOff);
+
+                    currentWidth = 0;
+                    for (int j = lastPossibleCutOff; j <= i; j++)
+                    {
+                        currentWidth += IsCJKCharacter(line[j].c) ? charWidthCJK : charWidth;
+                    }
+
+                    lastCutOffPosition = lastPossibleCutOff;
+                    currentMaxWidth = secondaryMaxWidth;
                 }
             }
         }
