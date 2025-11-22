@@ -1002,6 +1002,11 @@
             Height of char in pixels (includes LineInterval)
             </summary>
         </member>
+        <member name="P:FastColoredTextBoxNS.FastColoredTextBox.CharHeightCJK">
+            <summary>
+            Height of CJK char in pixels (한글, 한자 등, includes LineInterval)
+            </summary>
+        </member>
         <member name="P:FastColoredTextBoxNS.FastColoredTextBox.LineInterval">
             <summary>
             Interval between lines (in pixels)
@@ -1009,7 +1014,12 @@
         </member>
         <member name="P:FastColoredTextBoxNS.FastColoredTextBox.CharWidth">
             <summary>
-            Width of char in pixels
+            Width of char in pixels (ASCII)
+            </summary>
+        </member>
+        <member name="P:FastColoredTextBoxNS.FastColoredTextBox.CharWidthCJK">
+            <summary>
+            Width of CJK char in pixels (한글, 한자 등)
             </summary>
         </member>
         <member name="P:FastColoredTextBoxNS.FastColoredTextBox.TabLength">
@@ -1825,6 +1835,16 @@
             <param name="styles"></param>
             <returns>StyleIndex mask of given styles</returns>
         </member>
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.IsCJKCharacter(System.Char)">
+            <summary>
+            CJK(한글, 한자, 일본어) 문자인지 판별
+            </summary>
+        </member>
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.GetTextWidth(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            특정 범위의 문자들의 전체 폭 계산 (CJK 고려)
+            </summary>
+        </member>
         <member name="M:FastColoredTextBoxNS.FastColoredTextBox.ClearSelected">
             <summary>
             Deletes selected chars
@@ -1835,7 +1855,7 @@
             Deletes current line(s)
             </summary>
         </member>
-        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.CalcCutOffs(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean,System.Boolean,FastColoredTextBoxNS.Line)">
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.CalcCutOffs(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean,System.Boolean,FastColoredTextBoxNS.Line,System.Int32,System.Int32)">
             <summary>
             Calculates wordwrap cutoffs
             </summary>
